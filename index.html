@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A simple, visual introduction to NVLink architecture.">
+  <title>NVLink — One Idea at a Time</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f7f8fa;
+      --surface: #ffffff;
+      --text: #18202b;
+      --muted: #5c6878;
+      --line: #d9dee7;
+      --accent: #3167d5;
+      --accent-soft: #eaf0ff;
+      --good: #16734a;
+      --warn: #9a5b00;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #101318;
+        --surface: #171b22;
+        --text: #edf1f7;
+        --muted: #a5afbe;
+        --line: #313846;
+        --accent: #78a3ff;
+        --accent-soft: #1d2b4c;
+        --good: #70d5a5;
+        --warn: #f2bb66;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.55; }
+    button { font: inherit; }
+    .page { width: min(960px, calc(100% - 32px)); margin: 0 auto; padding: 36px 0 52px; }
+    header { margin-bottom: 24px; }
+    .eyebrow { color: var(--accent); font-size: .82rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 4px 0 8px; font-size: clamp(1.9rem, 5vw, 3rem); line-height: 1.1; }
+    h2 { margin: 0 0 10px; font-size: 1.55rem; }
+    h3 { margin: 0 0 6px; font-size: 1rem; }
+    p { margin: 0 0 12px; }
+    .muted { color: var(--muted); }
+    .progress { height: 6px; overflow: hidden; border-radius: 99px; background: var(--line); margin: 22px 0 14px; }
+    .progress > div { height: 100%; background: var(--accent); transition: width .2s ease; }
+    .step-label { color: var(--muted); font-size: .88rem; }
+    .lesson { margin-top: 22px; padding: clamp(20px, 4vw, 36px); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+    .idea { margin: 18px 0; padding: 14px 16px; background: var(--accent-soft); border-left: 4px solid var(--accent); border-radius: 6px; }
+    .diagram { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 26px 0; }
+    .node { min-width: 140px; padding: 18px 14px; text-align: center; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+    .node.primary { border-color: var(--accent); }
+    .node span { display: block; color: var(--muted); font-size: .82rem; }
+    .link { min-width: 88px; text-align: center; color: var(--muted); font-size: .78rem; }
+    .link::after { content: ""; display: block; height: 3px; margin-top: 4px; background: var(--accent); border-radius: 99px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
+    .box { padding: 16px; border: 1px solid var(--line); border-radius: 10px; }
+    pre { overflow-x: auto; margin: 18px 0; padding: 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--text); }
+    details { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 8px; }
+    summary { cursor: pointer; font-weight: 700; }
+    details p { margin: 10px 0 0; color: var(--good); }
+    nav { display: flex; gap: 10px; align-items: center; margin-top: 18px; }
+    nav button, .steps button {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 13px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+    }
+    nav button.primary, .steps button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    nav button:disabled { opacity: .4; cursor: not-allowed; }
+    .spacer { flex: 1; }
+    .steps { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 14px; }
+    .steps button { width: 38px; height: 38px; padding: 0; }
+    footer { margin-top: 30px; color: var(--muted); font-size: .85rem; }
+    @media (max-width: 620px) {
+      .grid { grid-template-columns: 1fr; }
+      .link { width: 54px; transform: rotate(90deg); margin: 12px; }
+      .diagram { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div class="eyebrow">Beginner guide</div>
+      <h1>NVLink, One Idea at a Time</h1>
+      <p class="muted">Eight small visual milestones. No hardware background required.</p>
+      <div class="progress" aria-label="Lesson progress"><div id="progress"></div></div>
+      <div class="step-label" id="step-label"></div>
+      <div class="steps" id="steps" aria-label="Choose milestone"></div>
+    </header>
+
+    <article class="lesson" id="lesson" aria-live="polite"></article>
+
+    <nav aria-label="Lesson navigation">
+      <button id="previous">Previous</button>
+      <div class="spacer"></div>
+      <button class="primary" id="next">Next milestone</button>
+    </nav>
+
+    <footer>This guide explains architecture concepts. Exact capabilities vary by NVIDIA platform and generation.</footer>
+  </main>
+
+  <script>
+    const lessons = [
+      {
+        title: "What NVLink does",
+        html: `
+          <h2>NVLink moves data between GPUs</h2>
+          <div class="idea"><strong>Core idea:</strong> GPU memory stores data; NVLink transports it.</div>
+          <div class="diagram">
+            <div class="node primary"><strong>GPU A memory</strong><span>Data starts here</span></div>
+            <div class="link">NVLink</div>
+            <div class="node primary"><strong>GPU B memory</strong><span>Data arrives here</span></div>
+          </div>
+          <p>A matrix, gradient, or model parameter is a block of numbers in GPU memory. NVLink carries the bytes representing those numbers. It does not calculate them and does not permanently store them.</p>
+          <details><summary>Quick check: does NVLink calculate a matrix?</summary><p>No. GPUs calculate; NVLink carries the result.</p></details>`
+      },
+      {
+        title: "NVSwitch and routes",
+        html: `
+          <h2>NVSwitch is a junction</h2>
+          <div class="diagram">
+            <div class="node"><strong>GPU A</strong><span>Sender</span></div>
+            <div class="link">NVLink</div>
+            <div class="node primary"><strong>NVSwitch</strong><span>Selects an exit port</span></div>
+            <div class="link">NVLink</div>
+            <div class="node"><strong>GPU B</strong><span>Destination</span></div>
+          </div>
+          <pre>Destination GPU B → exit port 7
+Destination GPU C → exit port 12</pre>
+          <p>Control software builds these forwarding rules. NVSwitch hardware stores and follows them when data arrives.</p>
+          <details><summary>Quick check: what does “build a route” mean?</summary><p>Decide and record which outgoing switch port reaches a destination.</p></details>`
+      },
+      {
+        title: "Address, route, and filter",
+        html: `
+          <h2>Three questions, three answers</h2>
+          <div class="grid">
+            <div class="box"><h3>ALID</h3><p>Which GPU is the destination?</p></div>
+            <div class="box"><h3>Route</h3><p>Which switch port reaches it?</p></div>
+            <div class="box"><h3>RailFilter</h3><p>Is that ingress-to-egress path allowed?</p></div>
+            <div class="box"><h3>NVLink</h3><p>Carry the data over the physical connection.</p></div>
+          </div>
+          <pre>ALID 0x450 → GPU B
+GPU B       → exit port 7
+RailFilter  → port 7 allowed</pre>
+          <details><summary>Quick check: does an ALID describe the entire path?</summary><p>No. It identifies the GPU; routing describes how to reach it.</p></details>`
+      },
+      {
+        title: "Partitions and permission",
+        html: `
+          <h2>A physical path may still be forbidden</h2>
+          <div class="grid">
+            <div class="box"><h3>Partition A</h3><p>GPU 1 and GPU 2</p></div>
+            <div class="box"><h3>Partition B</h3><p>GPU 3 and GPU 4</p></div>
+          </div>
+          <pre>GPU 1 ↔ GPU 2  allowed
+GPU 3 ↔ GPU 4  allowed
+GPU 1 ↔ GPU 3  blocked</pre>
+          <p>Partitions isolate users or jobs that share the same physical fabric. Routing asks whether a destination is reachable; filtering asks whether using the path is permitted.</p>
+          <details><summary>Why block a path that physically exists?</summary><p>For security, isolation, predictable sharing, and fault containment.</p></details>`
+      },
+      {
+        title: "Planes and rails",
+        html: `
+          <h2>Fabric section versus port group</h2>
+          <div class="grid">
+            <div class="box"><h3>Plane</h3><p>A separate topology section containing switches and GPU ports. Routes normally stay inside their plane.</p></div>
+            <div class="box"><h3>Rail</h3><p>A logical group of ports and possible paths used as a controlled traffic lane.</p></div>
+          </div>
+          <pre>Plane 1
+├── Rail 0: ports {1, 4, 7}
+└── Rail 1: ports {2, 5, 8}</pre>
+          <p>A route is one specific journey. A rail is a group that may contain several possible routes.</p>
+          <details><summary>Quick check: is a rail one exact route?</summary><p>No. It is a logical group of ports and possible paths.</p></details>`
+      },
+      {
+        title: "Observed and desired state",
+        html: `
+          <h2>NVLSM observes, compares, and repairs</h2>
+          <div class="grid">
+            <div class="box"><h3>Observed</h3><p>What hardware currently contains: ports {2, 7, 9}</p></div>
+            <div class="box"><h3>Desired</h3><p>What policy requires: ports {2, 7}</p></div>
+          </div>
+          <pre>GET observed → calculate desired → compare
+different    → SET desired
+equal        → do nothing</pre>
+          <p>This reconciliation loop safely repairs configuration while avoiding unnecessary writes.</p>
+          <details><summary>When does NVLSM send SET?</summary><p>When observed hardware state differs from desired state, or initial configuration is required.</p></details>`
+      },
+      {
+        title: "Safe rerouting",
+        html: `
+          <h2>Contain, drain, update, resume</h2>
+          <pre>Normal traffic
+      ↓
+Contain: stop new affected traffic
+      ↓
+Drain: let in-flight packets finish
+      ↓
+Update routes and filters
+      ↓
+Resume traffic</pre>
+          <p>Draining avoids a packet seeing old rules in one switch and new rules in another. Only affected ports or partitions need to be contained.</p>
+          <div class="idea"><strong>State machine:</strong> Maintain → Reroute requested → Reroute → Maintain.</div>
+          <details><summary>Why not change the route immediately?</summary><p>Packets already travelling could be dropped or misrouted by inconsistent switch rules.</p></details>`
+      },
+      {
+        title: "FEC and the full picture",
+        html: `
+          <h2>FEC protects bits on the physical link</h2>
+          <pre>Original data + correction bits → NVLink
+                         corrupted bit
+                              ↓
+Receiver uses FEC → corrected data</pre>
+          <p>Forward Error Correction detects and corrects a limited number of transmission errors without requesting the data again.</p>
+          <div class="idea"><strong>Complete model:</strong> ALID names the GPU, routing selects a path, partitions and RailFilter permit it, NVLink carries the bytes, and FEC protects those bytes.</div>
+          <details><summary>Final check: does FEC choose the route?</summary><p>No. FEC protects data on a link; routing chooses where data goes.</p></details>`
+      }
+    ];
+
+    let current = 0;
+    const lesson = document.getElementById("lesson");
+    const progress = document.getElementById("progress");
+    const label = document.getElementById("step-label");
+    const previous = document.getElementById("previous");
+    const next = document.getElementById("next");
+    const steps = document.getElementById("steps");
+
+    lessons.forEach((item, index) => {
+      const button = document.createElement("button");
+      button.textContent = String(index + 1);
+      button.title = item.title;
+      button.setAttribute("aria-label", `Milestone ${index + 1}: ${item.title}`);
+      button.addEventListener("click", () => { current = index; render(); });
+      steps.appendChild(button);
+    });
+
+    function render() {
+      const item = lessons[current];
+      lesson.innerHTML = item.html;
+      label.textContent = `Milestone ${current + 1} of ${lessons.length} · ${item.title}`;
+      progress.style.width = `${((current + 1) / lessons.length) * 100}%`;
+      previous.disabled = current === 0;
+      next.disabled = current === lessons.length - 1;
+      next.textContent = current === lessons.length - 1 ? "Guide complete" : "Next milestone";
+      [...steps.children].forEach((button, index) => {
+        button.classList.toggle("active", index === current);
+        button.setAttribute("aria-current", index === current ? "step" : "false");
+      });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    previous.addEventListener("click", () => {
+      if (current > 0) { current -= 1; render(); }
+    });
+    next.addEventListener("click", () => {
+      if (current < lessons.length - 1) { current += 1; render(); }
+    });
+
+    render();
+  </script>
+</body>
+</html>
